@@ -1,0 +1,82 @@
+
+import pandas as pd #get the dataset as pandas
+from datasets import Dataset #make the pandas set a huggiingface set why? bc it has ttokenrizers and trainers
+import string
+import torchtext
+df = pd.read_excel("dataset.xlsx") #got our dataset
+
+dataset = Dataset.from_pandas(df) #make it a huggingface dataset
+
+#now we are gonna need to split the dattaset
+split_dataset = dataset.train_test_split(test_size=0.1) #the rows will be shuffeled dont be alarmed
+
+train_ds = split_dataset["train"]
+test_ds = split_dataset["test"]
+
+
+#get a spacy model that can deal wiiith arabic to get a tokenizer
+
+import regex as re
+import string
+
+sos_token = "<sos>"
+eos_token = "<eos>"
+max_length = 20
+
+punctuation = string.punctuation + "؟،؛"
+
+# Arabic letters + diacritics
+arabic_pattern = r'[\p{Arabic}\p{M}]+|[a-zA-Z0-9]+'
+# \p{M} matches **marks** (diacritics)
+
+def clean_text(text):
+    # remove punctuation
+    return ''.join([c for c in str(text) if c not in punctuation])
+
+def tokenize_example(example):
+    src_clean = clean_text(example["sign"])
+    src_tokens = re.findall(arabic_pattern, src_clean)[:max_length]
+
+    tgt_clean = clean_text(example["spoken"])
+    tgt_tokens = re.findall(arabic_pattern, tgt_clean)[:max_length-2]
+    tgt_tokens = [sos_token] + tgt_tokens + [eos_token]
+
+    return {
+        "sign_tokens": src_tokens,
+        "spoken_tokens": tgt_tokens
+    }
+
+
+# Apply to your dataset
+train_token = train_ds.map(tokenize_example) #both of this these bad boys now have 4 columns each column wth its token
+test_token = test_ds.map(tokenize_example)
+print(train_token[0])
+ 
+ 
+ #now lets build tthe vocab by assignning a numbe to each word
+unk_token = "<unk>"
+pad_token = "<pad>"
+sos_token = "<sos>"
+eos_token = "<eos>"
+
+special_tokens = [unk_token, pad_token, sos_token, eos_token]
+min_freq = 1
+
+
+# Source vocabulary (sign language)
+sign_vocab = torchtext.vocab.build_vocab_from_iterator(
+    train_token["sign_tokens"],  # use tokenized version
+    min_freq=min_freq,
+    specials=special_tokens
+)
+
+spoken_vocab = torchtext.vocab.build_vocab_from_iterator(
+    train_token["spoken_tokens"],
+    min_freq=min_freq,
+    specials=special_tokens
+)
+
+
+
+print(sign_vocab['تروح'])   # integer index of 'تروح'
+print(spoken_vocab['<sos>'])  # index of <sos>
