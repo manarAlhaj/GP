@@ -78,5 +78,28 @@ spoken_vocab = torchtext.vocab.build_vocab_from_iterator(
 
 
 
-print(sign_vocab['تروح'])   # integer index of 'تروح'
+print(sign_vocab['امتحان'])   # integer index of 'تروح'
 print(spoken_vocab['<sos>'])  # index of <sos>
+
+#numericalize
+# Set default index to <unk> for unknown tokens
+sign_vocab.set_default_index(sign_vocab["<unk>"])
+spoken_vocab.set_default_index(spoken_vocab["<unk>"])
+
+# Function to convert tokens into indices
+def numericalize_example(example, sign_vocab, spoken_vocab):
+    sign_ids = sign_vocab.lookup_indices(example["sign_tokens"])
+    spoken_ids = spoken_vocab.lookup_indices(example["spoken_tokens"])
+    return {"sign_ids": sign_ids, "spoken_ids": spoken_ids}
+
+
+# Apply to your dataset
+train_num = train_token.map(numericalize_example, fn_kwargs={"sign_vocab": sign_vocab, "spoken_vocab": spoken_vocab})
+test_num = test_token.map(
+    numericalize_example,
+    fn_kwargs={"sign_vocab": sign_vocab, "spoken_vocab": spoken_vocab}
+)
+
+
+# Check the first example
+print(train_num[0])
