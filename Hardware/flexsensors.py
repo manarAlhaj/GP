@@ -53,7 +53,7 @@ class FlexSensors:
     def read_flex_norm(self):
         raw_vals = self.read_flex()
 
-        # if not calibrated - just scale raw values for debugging
+        # if not calibrated ,just scale raw values for debugging
         if not self.calibrated:
             MAX_ADC = 32767  # ADS1115 signed max
             normalized = []
@@ -112,7 +112,7 @@ class FlexSensors:
         print("Keep your hand fully open...")
         time.sleep(1)
 
-        mins = [65535] * 5  # [65535, 65535, ...]
+        mins = [32767] * 5  # [32767, 32767, ...]
         start = time.time()
         while time.time() - start < duration:
             vals = self.read_flex()
