@@ -9,3 +9,10 @@
 # 3- Magnetometer (3 axes) - Measures magnetic field (like a compass)
 # X, Y, Z magnetic field strength
 
+
+import serial as s
+
+from Hardware import flexsensors
+
+sers = s.Serial(port='/dev/serial0', baudrate=57600, timeout=1)
+f = flexsensors()
