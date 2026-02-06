@@ -1,4 +1,5 @@
 from collections import deque
+import math
 import serial
 
 
@@ -76,20 +77,23 @@ while True:
                         if DeltaYaw < -180:
                             DeltaYaw += 360
 
-                    
-                    PrevYaw = CurrentYaw
-                    PrevPitch = CurrentPitch
-                    PrevRoll = CurrentRoll
+                    YawRadians = math.radians(CurrentYaw)
+                    YawSine = round(math.sin(YawRadians),3)
+                    YawCosine = round(math.cos(YawRadians),3)
 
-             
                     features = [
-                        round(CurrentYaw, 2), 
+                        YawSine, 
+                        YawCosine,
                         round(CurrentPitch, 2), 
                         round(CurrentRoll, 2), 
                         round(DeltaYaw, 2), 
                         round(DeltaPitch, 2), 
                         round(DeltaRoll, 2)
                     ]
+
+                    PrevYaw = CurrentYaw
+                    PrevPitch = CurrentPitch
+                    PrevRoll = CurrentRoll
 
                     previous_buffer.append(features)
              
