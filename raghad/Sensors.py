@@ -1,6 +1,6 @@
 
 import time
-from flexsensors import FlexSensors
+from FlexSensors import FlexSensors
 from IMUc import IMUc
 
 
@@ -16,13 +16,13 @@ def CollectData():
 
     #step 2 : call the calibration function of the flex sensors first , bc flex sensors need MOVEMENT 
 
-    print("\n" + "="*40)
-    print("\n Calibrating the flex sensors..")
-    input("Press Enter when you are ready ")
+    #print("\n" + "="*40)
+    #print("\n Calibrating the flex sensors..")
+    #input("Press Enter when you are ready ")
 
-    print("="*40)
+    #print("="*40)
 
-    flex.calibrate(duration=5)
+    #flex.calibrate(duration=5)
     
 
 

@@ -3,7 +3,8 @@ import time
 from Sensors import CollectData
 
 
-input_file = "C:/Users/LENOVO/OneDrive - University Of Jordan/Desktop/Grad Proj/Book1.xlsx" 
+
+input_file = "/home/mnrn/Desktop/GP/raghad/Book1.xlsx"
 df_input = pd.read_excel(input_file, header=None)  # read the file 
 
 output_file = "output.xlsx"     
@@ -23,12 +24,12 @@ for index, row in df_input.iterrows():
 
         samples = CollectData() # the function that has the data
         
-        if samples is None or len(samples) == 0:            # no data 
-            print("No data collected, skipping trial.")
-            continue
+        #if samples is None or len(samples) == 0:            # no data 
+         #   print("No data collected, skipping trial.")
+          #  continue
         
         for sample in samples:
-            results.append([word, trial_num] + sample)
+            results.append([word] + sample)
         print(f"Trial {trial_num}/{num_trials} for word '{word}' is done! Press Enter for next trial.")
 
 # save all results to Excel file 
