@@ -100,7 +100,11 @@ class IMUc:
     def _get_corrected_roll(self,raw_roll):
         return raw_roll - self.offset_roll
     
+    def AllowNonBlocking (self):
+        self.ser.timeout = 0 
+        print("timeout now is 0 , non blocking reading is allowed ")
 
+        
     def read_raw_YPR(self):
         if self.ser.in_waiting > 0:
             try:

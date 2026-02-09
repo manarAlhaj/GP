@@ -15,6 +15,8 @@ class FlexSensors:
             import adafruit_ads1x15.ads1115 as ADS
             from adafruit_ads1x15.analog_in import AnalogIn
 
+     
+
             # this initializes the i2c pins (pi-safe)
             i2c = board.I2C()
 
@@ -80,9 +82,10 @@ class FlexSensors:
         if self.simulation:
             return [random.uniform(0.5, 3) for _ in range(5)]
         else:
+           
             voltages = []
             for v in self.sensors:
-                voltages.append(v.voltage)
+                voltages.append(v.voltage)  
             return voltages
 
 
@@ -112,7 +115,7 @@ class FlexSensors:
         print("Keep your hand fully open...")
         time.sleep(1)
 
-        mins = [32767] * 5  # [32767, 32767, ...]
+        mins = [32767] * 5  
         start = time.time()
         while time.time() - start < duration:
             vals = self.read_flex()
@@ -133,7 +136,7 @@ class FlexSensors:
             time.sleep(0.05)
 
 
-        # For each finger, if what we thought was the minimum is actually larger than the maximum, swap them.
+        # fooorr each finger, if what we thought was the minimum is actually larger than the maximum, swap them.
         for i in range(5):
             if mins[i] > maxs[i]:
                 mins[i], maxs[i] = maxs[i], mins[i]
@@ -179,8 +182,8 @@ def main():
     for volt in voltages:
         print("Flex Voltage Value:", volt)
 
-    print("\n== Running test 4 .. Continuous reading ==")
-    flex.test(duration=5)
+    #print("\n== Running test 4 .. Continuous reading ==")
+    #flex.test(duration=5)
 
 
 if __name__ == "__main__":
