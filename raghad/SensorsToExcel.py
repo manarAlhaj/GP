@@ -6,7 +6,6 @@ import FlexSensors
 def read_flex_sensor():
     flex = FlexSensors.FlexSensors()
     voltages = flex.read_voltage()
-    # we should add the flex sensor code here 
     return voltages
     #return [0.2, 0.3, 0.1, 0.5, 0.6]
 
@@ -45,5 +44,3 @@ columns = ["Word", "Thumb", "Index", "Middle", "Ring", "Pinky"]
 df_output = pd.DataFrame(results, columns=columns)
 df_output.to_excel(output_file, index=False)
 print(f"\n Result is saved in : ", output_file)
-import os
-print(os.path.abspath(output_file))
