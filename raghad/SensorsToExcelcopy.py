@@ -10,7 +10,7 @@ df_input = pd.read_excel(input_file, header=None)  # read the file
 output_file = "output.xlsx"     
 results = []
 
-num_trials = 1      
+num_trials = 5  # it was 1      
 trial_duration = 2   
 sample_interval = 1   
 
