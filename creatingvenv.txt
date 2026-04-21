@@ -1,0 +1,12 @@
+To create a virtual enviroment to install libraries 
+open terminal and run the following commands
+
+# C: python -m venv .venv
+# C: .venv\Scripts\activate
+now in vscode ctrl+shift+p then look for : Python > select interpter and pick the venv one it will be something with -> somepath /python.exe
+continue in terminal 
+#Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser 
+
+to ensure everything is fine run this and it should show u an output similar to this
+# python -c "import sys; print(sys.executable)"
+C:\Users\manar\Desktop\GP\.venv\Scripts\python.exe
