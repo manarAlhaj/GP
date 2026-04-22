@@ -110,7 +110,7 @@ def append_manifest(manifest_path, row):
 
 def load_words(csv_path):
     #Reads words from the first column of a CSV. Skips empty rows.
-    #If the first row looks like a header (e.g. 'word'), it is skipped
+    #If the first row looks like a header (word), it is skipped
     words = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
@@ -136,6 +136,7 @@ def prompt_choice(prompt, valid):
 
 def record_word(word, flex, right_imu, left_imu, args, raw_dir, manifest_path,
                 repeat_idx=None, total_repeats=None):
+    
     #Records one sample of a given word
     word_dir = os.path.join(raw_dir, word)
     os.makedirs(word_dir, exist_ok=True)
