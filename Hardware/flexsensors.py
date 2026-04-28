@@ -1,5 +1,6 @@
 
 import random
+import time
 
 #  please note that this must read the values of the flex sensors from the adc .. 
 #I have implemented many ways to get or read from the ADC, I will prolly get the values as their normal range, but 
@@ -13,22 +14,24 @@ class FlexSensors:
 
         try:
             import board
+            import busio
             import adafruit_ads1x15.ads1115 as ADS
             from adafruit_ads1x15.analog_in import AnalogIn
 
-            i2c = board.I2C()
+            i2c = busio.I2C(board.SCL, board.SDA)
 
             ads1 = ADS.ADS1115(i2c, address=0x48)
             ads1.data_rate = 860
+            ads1.gain=1
 
             ads2 = ADS.ADS1115(i2c, address=0x49)
             ads2.data_rate = 860
-
-            f1 = AnalogIn(ads1, ADS.P0)  # Thumb
-            f2 = AnalogIn(ads1, ADS.P1)  # Pointer
-            f3 = AnalogIn(ads1, ADS.P2)  # Middle
-            f4 = AnalogIn(ads1, ADS.P3)  # Ring
-            f5 = AnalogIn(ads2, ADS.P0)  # Pinky
+            ads2.gain=1
+            f1 = AnalogIn(ads1, 0)  # ring
+            f2 = AnalogIn(ads1, 1)  # middle
+            f3 = AnalogIn(ads1, 2)  # pointer
+            f4 = AnalogIn(ads1, 3)  # thumb
+            f5 = AnalogIn(ads2, 3)  # Pinky
 
             self.sensors = [f1, f2, f3, f4, f5]
             print("Five flex sensors initialized")
@@ -38,12 +41,15 @@ class FlexSensors:
             self.simulation = True
 
     def read(self):
-        """Returns a list of 5 raw ADC values in order: thumb, pointer, middle, ring, pinky."""
+
         if self.simulation:
             return [random.randint(10000, 50000) for _ in range(5)]
-        return [s.value for s in self.sensors]
+        for s in self.sensors:
+            print(s.value)
+            time.sleep(1)
 
 
 if __name__ == "__main__":
     flex = FlexSensors()
-    print("Sample read:", flex.read())
+    while True:
+        print("Sample read:", flex.read())

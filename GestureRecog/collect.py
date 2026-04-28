@@ -49,25 +49,28 @@ class EnterTrigger:
 
 # ============================================================ 
 
-def record_one_sample(flex, right_imu, left_imu, rate_hz, trigger):
-    #samples at 50hz until trigger fires. Returns numpy array of shape (T, 11)
+
+def RecordSample(flex, right_imu, left_imu, rate_hz, trigger):
+    #samples at 50hz until triggered. returns numpy array of shape (T, 11)
     period = 1.0 / rate_hz
     buffer = []
 
     last_right = (0.0, 0.0, 0.0)
     last_left = (0.0, 0.0, 0.0)
 
-    next_tick = time.perf_counter()
-    t0 = next_tick
+    next_tick = time.perf_counter() # a high-res timer, good for measuring intervals (for short durations)
+    t0 = next_tick #start time of the recording
 
-    while not trigger.pressed.is_set():
+    while not trigger.pressed.is_set(): #if enter isn't pressed, keep recording 
         flex_vals = flex.read()
 
         ry, rp, rr = right_imu.read()
+
         if ry is not None:
             last_right = (ry, rp, rr)
 
         ly, lp, lr = left_imu.read()
+
         if ly is not None:
             last_left = (ly, lp, lr)
 
@@ -79,18 +82,18 @@ def record_one_sample(flex, right_imu, left_imu, rate_hz, trigger):
         buffer.append(row)
 
         next_tick += period
-        sleep_for = next_tick - time.perf_counter()
-        if sleep_for > 0:
+        sleep_for = next_tick - time.perf_counter() #how much time left to the next tick to start recording the next. 
+        if sleep_for > 0: #if there's still time, means the loop is quick, so we wait till it finish to then go next tick
             time.sleep(sleep_for)
         else:
-            next_tick = time.perf_counter()
+            next_tick = time.perf_counter() #otherwise dont accumulate delay, just reset the next tick to nowwwww 
 
     duration = time.perf_counter() - t0
     arr = np.array(buffer, dtype=np.float32)
     return arr, duration
 
 
-def next_sample_index(word_dir, word, session):
+def NextSampleIndex(word_dir, word, session):
     if not os.path.isdir(word_dir):
         return 1
     existing = [f for f in os.listdir(word_dir)
@@ -98,9 +101,9 @@ def next_sample_index(word_dir, word, session):
     return len(existing) + 1
 
 
-def append_manifest(manifest_path, row):
-    new_file = not os.path.exists(manifest_path)
-    with open(manifest_path, "a", newline="", encoding="utf-8") as f:
+def AppendtoLog(LogPath, row):
+    new_file = not os.path.exists(LogPath)
+    with open(LogPath, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if new_file:
             w.writerow(["filepath", "word", "session", "sample_idx",
@@ -108,9 +111,7 @@ def append_manifest(manifest_path, row):
         w.writerow(row)
 
 
-def load_words(csv_path):
-    #Reads words from the first column of a CSV. Skips empty rows.
-    #If the first row looks like a header (word), it is skipped
+def LoadWords(csv_path): #read from the words dataset to do the gesture for
     words = []
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
@@ -126,7 +127,7 @@ def load_words(csv_path):
     return words
 
 
-def prompt_choice(prompt, valid):
+def PromptOption(prompt, valid):
     #asks until the user enters one of the valid chars
     while True:
         ans = input(prompt).strip().lower()
@@ -134,43 +135,52 @@ def prompt_choice(prompt, valid):
             return ans
 
 
-def record_word(word, flex, right_imu, left_imu, args, raw_dir, manifest_path,
+def RecordWords(word, flex, right_imu, left_imu, args, raw_dir, LogPath,
                 repeat_idx=None, total_repeats=None):
     
-    #Records one sample of a given word
+    #records one sample of a given word
     word_dir = os.path.join(raw_dir, word)
     os.makedirs(word_dir, exist_ok=True)
-    idx = next_sample_index(word_dir, word, args.session)
+    idx = NextSampleIndex(word_dir, word, args.session)
 
     suffix = f" (rep {repeat_idx}/{total_repeats})" if repeat_idx else ""
     print(f"\n  Now the word is '{word}'{suffix}. Sample #{idx}.")
     print("  Be ready to start recording. Press Enter to START.")
 
-    start_trigger = EnterTrigger()
-    start_trigger.arm()
-    start_trigger.pressed.wait()
+    StartTrigger = EnterTrigger() # thread 
+    StartTrigger.arm() #flag is false + thread started
+    StartTrigger.pressed.wait() #wait for Enter to be pressed -> here the trigger flag becomes true
+
+    #countdown 
+    for i in range(3, 0, -1):
+        print(f"  Starting in {i}...", end="\r", flush=True) #flush y3ni output the print immediatly with no buffering
+        #3shan ykon real time counting .... 
+        time.sleep(1)
+    print("                    ", end="\r")
+
+    #start here!!!!  
 
     print("  RECORDING... Press Enter to STOP.")
-    stop_trigger = EnterTrigger()
-    stop_trigger.arm()
+    stop_trigger = EnterTrigger() 
+    stop_trigger.arm() 
 
-    arr, duration = record_one_sample(flex, right_imu, left_imu, args.rate, stop_trigger)
+    arr, duration = RecordSample(flex, right_imu, left_imu, args.rate, stop_trigger)
 
     filename = f"{word}_{args.session}_{idx:03d}.npy"
     filepath = os.path.join(word_dir, filename)
 
-    expected = int(duration * args.rate)
+    expected = int(duration * args.rate) #expected T -> how many samples we expected to get based on the duration and the rate
     drift = arr.shape[0] - expected
     print(f"  Captured: shape={arr.shape}  duration={duration:.2f}s  drift={drift:+d} samples")
 
-    choice = prompt_choice(
+    choice = PromptOption(
         "  [Enter]=accept, r=redo, s=skip, q=quit: ",
         {"", "r", "s", "q"}
     )
 
-    if choice == "":
+    if choice == "": #enter 
         np.save(filepath, arr)
-        append_manifest(manifest_path, [
+        AppendtoLog(LogPath, [
             filepath, word, args.session, idx,
             arr.shape[0], f"{duration:.3f}", args.rate,
             datetime.now().isoformat(timespec="seconds"),
@@ -201,10 +211,11 @@ def main():
     args = parser.parse_args()
 
     raw_dir = os.path.join(args.data_dir, "raw")
-    manifest_path = os.path.join(args.data_dir, "manifest.csv")
+    LogPath = os.path.join(args.data_dir, "Logs.csv")
     os.makedirs(raw_dir, exist_ok=True)
 
-    words = load_words(args.words)
+    words = LoadWords(args.words)
+    #error handling
     if not words:
         print(f"No words found in {args.words}")
         return
@@ -218,6 +229,7 @@ def main():
         print(f"Starting from word index {args.start_from}: '{words[args.start_from]}'")
 
     print("\nInitializing sensors...")
+
     flex = FlexSensors()
     try:
         right_imu = IMUc()
@@ -229,18 +241,18 @@ def main():
     print("\nPress Enter to begin the session...")
     input()
 
-    quit_requested = False
+    QuitReq = False
     try:
         for word_i, word in enumerate(words[args.start_from:], start=args.start_from):
-            if quit_requested:
+            if QuitReq:
                 break
             print(f"\n=== Word {word_i + 1}/{len(words)}: '{word}' ===")
 
             rep = 1
             while rep <= args.repeats:
-                result = record_word(
+                result = RecordWords(
                     word, flex, right_imu, left_imu, args,
-                    raw_dir, manifest_path,
+                    raw_dir, LogPath,
                     repeat_idx=rep if args.repeats > 1 else None,
                     total_repeats=args.repeats if args.repeats > 1 else None,
                 )
@@ -251,7 +263,7 @@ def main():
                 elif result == "skip":
                     break
                 elif result == "quit":
-                    quit_requested = True
+                    QuitReq = True
                     break
 
     except KeyboardInterrupt:
