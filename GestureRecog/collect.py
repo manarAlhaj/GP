@@ -1,4 +1,3 @@
-
 import os
 import csv
 import time
@@ -11,7 +10,7 @@ import numpy as np
 from flexsensors import FlexSensors
 from IMUc import IMUc
 
-#enhanced collecting script 
+#enhanced collecting script
 
 # ---------- left hand IMU ---------
 class LeftIMU:
@@ -47,11 +46,12 @@ class EnterTrigger:
         self.pressed.set()
 
 
-# ============================================================ 
+# ============================================================
 
 
-def RecordSample(flex, right_imu, left_imu, rate_hz, trigger):
-    #samples at 50hz until triggered. returns numpy array of shape (T, 11)
+def RecordSample(flex, right_imu, left_imu, rate_hz, trigger, max_steps=None):
+    #samples at rate_hz until triggered or until max_steps timesteps are collected.
+    #returns numpy array of shape (T, 11) and the duration in seconds.
     period = 1.0 / rate_hz
     buffer = []
 
@@ -61,7 +61,7 @@ def RecordSample(flex, right_imu, left_imu, rate_hz, trigger):
     next_tick = time.perf_counter() # a high-res timer, good for measuring intervals (for short durations)
     t0 = next_tick #start time of the recording
 
-    while not trigger.pressed.is_set(): #if enter isn't pressed, keep recording 
+    while not trigger.pressed.is_set(): #if enter isn't pressed, keep recording
         flex_vals = flex.read()
 
         ry, rp, rr = right_imu.read()
@@ -81,12 +81,16 @@ def RecordSample(flex, right_imu, left_imu, rate_hz, trigger):
         ]
         buffer.append(row)
 
+        #auto-stop once we hit the timestep cap
+        if max_steps is not None and len(buffer) >= max_steps:
+            break
+
         next_tick += period
-        sleep_for = next_tick - time.perf_counter() #how much time left to the next tick to start recording the next. 
+        sleep_for = next_tick - time.perf_counter() #how much time left to the next tick to start recording the next.
         if sleep_for > 0: #if there's still time, means the loop is quick, so we wait till it finish to then go next tick
             time.sleep(sleep_for)
         else:
-            next_tick = time.perf_counter() #otherwise dont accumulate delay, just reset the next tick to nowwwww 
+            next_tick = time.perf_counter() #otherwise dont accumulate delay, just reset the next tick to nowwwww
 
     duration = time.perf_counter() - t0
     arr = np.array(buffer, dtype=np.float32)
@@ -111,19 +115,23 @@ def AppendtoLog(LogPath, row):
         w.writerow(row)
 
 
-def LoadWords(csv_path): #read from the words dataset to do the gesture for
+def PromptWords():
+    #ask the user to type words interactively. one word per line.
+    #empty line ends the entry phase.
+    print("\nEnter the words you want to record, one per line.")
+    print("Press Enter on an empty line when you are done.")
     words = []
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.reader(f)
-        for i, row in enumerate(reader):
-            if not row:
+    while True:
+        try:
+            val = input(f"  Word {len(words) + 1}: ").strip()
+        except EOFError:
+            break
+        if not val:
+            if not words:
+                print("  You must enter at least one word.")
                 continue
-            val = row[0].strip()
-            if not val:
-                continue
-            if i == 0 and val.lower() in ("word", "words", "label", "class"):
-                continue
-            words.append(val)
+            break
+        words.append(val)
     return words
 
 
@@ -137,7 +145,7 @@ def PromptOption(prompt, valid):
 
 def RecordWords(word, flex, right_imu, left_imu, args, raw_dir, LogPath,
                 repeat_idx=None, total_repeats=None):
-    
+
     #records one sample of a given word
     word_dir = os.path.join(raw_dir, word)
     os.makedirs(word_dir, exist_ok=True)
@@ -147,24 +155,30 @@ def RecordWords(word, flex, right_imu, left_imu, args, raw_dir, LogPath,
     print(f"\n  Now the word is '{word}'{suffix}. Sample #{idx}.")
     print("  Be ready to start recording. Press Enter to START.")
 
-    StartTrigger = EnterTrigger() # thread 
+    StartTrigger = EnterTrigger() # thread
     StartTrigger.arm() #flag is false + thread started
     StartTrigger.pressed.wait() #wait for Enter to be pressed -> here the trigger flag becomes true
 
-    #countdown 
+    #countdown
     for i in range(3, 0, -1):
         print(f"  Starting in {i}...", end="\r", flush=True) #flush y3ni output the print immediatly with no buffering
-        #3shan ykon real time counting .... 
+        #3shan ykon real time counting ....
         time.sleep(1)
     print("                    ", end="\r")
 
-    #start here!!!!  
+    #start here!!!!
 
-    print("  RECORDING... Press Enter to STOP.")
-    stop_trigger = EnterTrigger() 
-    stop_trigger.arm() 
+    cap = args.max_steps if args.max_steps > 0 else None
+    if cap is not None:
+        print(f"  RECORDING... Press Enter to STOP (auto-stops at {cap} timesteps).")
+    else:
+        print("  RECORDING... Press Enter to STOP.")
 
-    arr, duration = RecordSample(flex, right_imu, left_imu, args.rate, stop_trigger)
+    stop_trigger = EnterTrigger()
+    stop_trigger.arm()
+
+    arr, duration = RecordSample(flex, right_imu, left_imu, args.rate,
+                                 stop_trigger, max_steps=cap)
 
     filename = f"{word}_{args.session}_{idx:03d}.npy"
     filepath = os.path.join(word_dir, filename)
@@ -173,12 +187,17 @@ def RecordWords(word, flex, right_imu, left_imu, args, raw_dir, LogPath,
     drift = arr.shape[0] - expected
     print(f"  Captured: shape={arr.shape}  duration={duration:.2f}s  drift={drift:+d} samples")
 
+    #print the full numpy array for validation
+    print("  Recorded data:")
+    with np.printoptions(threshold=np.inf, suppress=True, precision=2, linewidth=200):
+        print(arr)
+
     choice = PromptOption(
         "  [Enter]=accept, r=redo, s=skip, q=quit: ",
         {"", "r", "s", "q"}
     )
 
-    if choice == "": #enter 
+    if choice == "": #enter
         np.save(filepath, arr)
         AppendtoLog(LogPath, [
             filepath, word, args.session, idx,
@@ -200,7 +219,6 @@ def RecordWords(word, flex, right_imu, left_imu, args, raw_dir, LogPath,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--words", required=True, help="Path to CSV with one word per row.")
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--session", default=datetime.now().strftime("s%Y%m%d"))
     parser.add_argument("--rate", type=int, default=50)
@@ -208,23 +226,27 @@ def main():
                         help="How many times to record each word in a row before moving on.")
     parser.add_argument("--start-from", type=int, default=0,
                         help="Skip ahead to the Nth word in the list (0-indexed).")
+    parser.add_argument("--max-steps", type=int, default=100,
+                        help="Auto-stop recording after this many timesteps. Set to 0 to disable.")
     args = parser.parse_args()
 
     raw_dir = os.path.join(args.data_dir, "raw")
     LogPath = os.path.join(args.data_dir, "Logs.csv")
     os.makedirs(raw_dir, exist_ok=True)
 
-    words = LoadWords(args.words)
+    words = PromptWords()
     #error handling
     if not words:
-        print(f"No words found in {args.words}")
+        print("No words entered.")
         return
     if args.start_from >= len(words):
         print(f"--start-from {args.start_from} is past the end of the list ({len(words)} words)")
         return
 
-    print(f"Loaded {len(words)} words from {args.words}")
+    print(f"\nLoaded {len(words)} word(s): {', '.join(words)}")
     print(f"Session: {args.session}  |  Rate: {args.rate} Hz  |  Repeats per word: {args.repeats}")
+    if args.max_steps > 0:
+        print(f"Max timesteps per recording: {args.max_steps}")
     if args.start_from:
         print(f"Starting from word index {args.start_from}: '{words[args.start_from]}'")
 
