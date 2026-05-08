@@ -16,10 +16,6 @@ Pipeline:
 from keras.utils import Sequence, to_categorical
 import pandas as pd
 import numpy as np
-import os
-from scipy.interpolate import interp1d
-from scipy.signal import resample
-import tensorflow as tf
 from keras import layers, models, regularizers
 from preprocessing import preprocess_single, AugmentSample, apply_zscore, compute_signer_stats
 
@@ -189,7 +185,7 @@ def Lstm (
 
 
 if __name__ == "__main__":
-    mod = Lstm(featuresNum=11, classesNum=11, TimeSteps=120)
+    mod = Lstm(featuresNum=16, classesNum=11, TimeSteps=100)
     mod.summary()
     
 
