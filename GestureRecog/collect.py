@@ -4,26 +4,56 @@ import time
 import threading
 import argparse
 from datetime import datetime
+import asyncio
 
+from ble_imu_receiver import BLEIMUReceiver
 import numpy as np
 
 from flexsensors import FlexSensors
 from IMUc import IMUc
 
-#enhanced collecting script
+
 
 # ---------- left hand IMU ---------
 class LeftIMU:
+    def __init__(self, connect_timeout=30):
+        self.receiver = BLEIMUReceiver()
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
 
-    def __init__(self):
-        self.last = (0.0, 0.0, 0.0)
-        print("Left IMU: (zeros)")
+        print("Left IMU (BLE): connecting...")
+        fut = asyncio.run_coroutine_threadsafe(
+            self.receiver.connect(), self.loop
+        )
+        try:
+            fut.result(timeout=connect_timeout)
+            print("Left IMU (BLE): connected")
+        except Exception as e:
+            print("Left IMU (BLE): connect failed:", e)
+            self._shutdown_loop()
+            raise
 
-    def read(self):
-        return self.last
+    def _run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    def read(self):   
+        return self.receiver.read()
+
+    def _shutdown_loop(self):
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join(timeout=2)
 
     def close(self):
-        pass
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self.receiver.disconnect(), self.loop
+            )
+            fut.result(timeout=5)
+        except Exception as e:
+            print("Left IMU (BLE): disconnect error:", e)
+        self._shutdown_loop()
 
 
 # ---------- keyboard trigger ----------
@@ -47,7 +77,8 @@ class EnterTrigger:
 
 
 # ============================================================
-
+def EMA(prev, new, alpha=0.4):
+    return prev + alpha * (new - prev)
 
 def RecordSample(flex, right_imu, left_imu, rate_hz, trigger, max_steps=None):
     #samples at rate_hz until triggered or until max_steps timesteps are collected.
@@ -67,15 +98,15 @@ def RecordSample(flex, right_imu, left_imu, rate_hz, trigger, max_steps=None):
         ry, rp, rr = right_imu.read()
 
         if ry is not None:
-            last_right = (ry, rp, rr)
+            last_right = (EMA(last_right[0], ry), EMA(last_right[1], rp), EMA(last_right[2], rr))
 
         ly, lp, lr = left_imu.read()
 
         if ly is not None:
-            last_left = (ly, lp, lr)
+            last_left = (EMA(last_left[0], ly), EMA(last_left[1], lp), EMA(last_left[2], lr))
 
         row = [
-            flex_vals[0], flex_vals[1], flex_vals[2], flex_vals[3], flex_vals[4],
+            flex_vals[3], flex_vals[2], flex_vals[1], flex_vals[0], flex_vals[4],
             last_right[0], last_right[1], last_right[2],
             last_left[0], last_left[1], last_left[2],
         ]
@@ -253,12 +284,19 @@ def main():
     print("\nInitializing sensors...")
 
     flex = FlexSensors()
+    right_imu = None
+    left_imu = None
     try:
         right_imu = IMUc()
     except Exception as e:
         print("Right IMU init failed:", e)
         return
-    left_imu = LeftIMU()
+    try:
+        left_imu = LeftIMU()
+    except Exception as e:
+        print("Left IMU failed:", e)
+        right_imu.close()
+        return
 
     print("\nPress Enter to begin the session...")
     input()
@@ -291,9 +329,11 @@ def main():
     except KeyboardInterrupt:
         print("\nInterrupted.")
     finally:
-        right_imu.close()
-        left_imu.close()
-        print("\nDone.")
+        if right_imu is not None:
+            right_imu.close()
+        if left_imu is not None:
+            left_imu.close()
+    print("\nDone.")
 
 
 if __name__ == "__main__":

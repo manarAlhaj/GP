@@ -12,9 +12,7 @@ from keras.optimizers import Adam
 from LSTM import LoadData, ClassMapper, SessionSplit, GestureSeq, Lstm
 
 
-# ------------------------------------------------------------------ #
 
-#i will chose only the first 95% of the data 3shan the last data will probably have unimportant values ( me finishing the word and going to click enter)
 def PickTargetT(train_df: pd.DataFrame, percentile: float = 95.0) -> int:
     return int(np.ceil(np.percentile(train_df["n_timesteps"], percentile)))
 
@@ -53,23 +51,19 @@ def main():
     parser.add_argument("--seed",       type=int, default=42)
     args = parser.parse_args()
 
-    # Reproducibility
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
 
-    # Output directory
     if args.out_dir is None:
         args.out_dir = os.path.join("runs", datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # ---- Load manifest and build label map -------------------------
     df = LoadData(args.manifest)
     word_to_id, id_to_word = ClassMapper(df)
     num_classes = len(word_to_id)
     print(f"Loaded {len(df)} samples | {num_classes} classes "
           f"| {df['session'].nunique()} sessions")
 
-    # ---- Session split ---------------------------------------------
     val_sessions = args.val_sessions or DefaultValSessions(df)
     print(f"Validation sessions: {val_sessions}")
     train_df, val_df = SessionSplit(df, val_sessions)
@@ -78,11 +72,9 @@ def main():
     if len(val_df) == 0:
         raise ValueError("Validation split is empty. Check --val-sessions.")
 
-    # ---- Padding length (decided from training data only) ----------
     target_T = PickTargetT(train_df, percentile=95.0)
     print(f"Padding length T = {target_T}  (95th percentile of train n_timesteps)")
 
-    # ---- Feature count (read from the first file) ------------------
     sample_arr = np.load(train_df.iloc[0]["filepath"])
     num_features = sample_arr.shape[1]
     print(f"Feature count F = {num_features}")
